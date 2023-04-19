@@ -25,8 +25,14 @@
 #include<sys/mman.h>
 #include<string>
 #include<stdarg.h>
-#include"locker.h"
+#include<sys/wait.h>
+#include<sys/uio.h>
+#include<map>
+
 #include"../conn_mysql/sql_connection_pool.h"
+#include"../time.h"
+#include"../log/log.h"
+#include"../locker/locker.h"
 
 class http_conn
 {
@@ -52,7 +58,8 @@ public:
     ~http_conn(){}
 public:
     //初始化新接受的连接
-    void init(int sockfd,const sockaddr_in& addr);
+    void init(int sockfd, const sockaddr_in &addr, char *root, int TRIGMode,
+                     int close_log, string user, string passwd, string sqlname);
     //关闭连接
     void close_conn(bool real_close=true);
     //处理客户请求
@@ -61,8 +68,11 @@ public:
     bool read();
     //非阻塞写操作
     bool write();
-
-    void initmysql_result();
+    sockaddr_in *get_address()
+    {
+        return &m_address;
+    }
+    void initmysql_result(connection_pool * connPool);
     void inittresultFile(connection_pool * connPool);
 private:
     //初始连接
@@ -85,6 +95,7 @@ private:
     bool add_content(const char* content);
     bool add_status_line(int status,const char* title);
     bool add_headers(int content_length);
+    bool add_content_type();
     bool add_content_length(int content_lenght);
     bool add_linger();
     bool add_blank_line();
@@ -95,6 +106,7 @@ public:
     //统计用户数量
     static int m_user_count;
     MYSQL *mysql;
+    int m_state;
 private:
     //该HTTP连接的sockte和对方的socket地质
     int  m_socketfd;
@@ -141,6 +153,15 @@ private:
     char *m_string;
     int btyes_to_send;
     int btyes_have_send;
+    char *doc_root;
+
+    map<string,string> m_users;
+    int m_TRIGMode;
+    int m_close_log;
+
+    char sql_user[100];
+    char sql_passwd[100];
+    char sql_name[100];
 
 };
 

@@ -4,6 +4,7 @@
 #include<iostream>
 #include<netinet/in.h>
 #include<time.h>
+#include"../log/log.h"
 
 #define BUFFER_SIZE 64
 
@@ -179,11 +180,6 @@ private:
         array=temp;
     }
 };
-
-
-
-
-
 
 
 
