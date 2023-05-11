@@ -53,6 +53,7 @@ public:
     int m_LISTENTrigmode;
     int m_CONNTrigmode;
 
+
     //定时器相关
     client_data *users_timer;
     Utils utils;

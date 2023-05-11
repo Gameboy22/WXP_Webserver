@@ -14,10 +14,11 @@ class threadpool
 {
 
 public:
-    threadpool(connection_pool *connPool, int thread_number=8,int max_requests=10000);
+    threadpool(int actor_model,connection_pool *connPool, int thread_number=8,int max_requests=10000);
     ~threadpool();
     //往请求队列中添加任务
-    bool append(T* request);
+    bool append(T* request,int state);
+    bool append_p(T *request);
 private:
     //工作线程运行的函数，它不断从工作队列中取出任务并执行
     static void* worker(void* arg);
@@ -36,7 +37,7 @@ private:
 };
 
 template<typename T>
-threadpool<T>::threadpool(connection_pool *connPool, int thread_number,int max_requests):
+threadpool<T>::threadpool(int actor_model,connection_pool *connPool, int thread_number,int max_requests):
             m_thread_number(thread_number),m_max_requests(max_requests),m_stop(false),m_threads(NULL),m_connPool(connPool)
 {
     //printf("%d %d 初始化线程池\n",thread_number,max_requests);
@@ -78,11 +79,26 @@ threadpool<T>::~threadpool()
 }
 
 template<typename T>
-bool threadpool<T>::append(T* request)
+bool threadpool<T>::append(T* request,int state)
 {
     //操作队列时一定要枷锁,因为他被所有线程共享
     m_queuelocker.lock();
-    if(m_workqueue.size()>m_max_requests)
+    if (m_workqueue.size() >= m_max_requests)
+    {
+        m_queuelocker.unlock();
+        return false;
+    }
+    request->m_state = state;
+    m_workqueue.push_back(request);
+    m_queuelocker.unlock();
+    m_queuestat.post();
+    return true;
+}
+template <typename T>
+bool threadpool<T>::append_p(T *request)
+{
+    m_queuelocker.lock();
+    if (m_workqueue.size() >= m_max_requests)
     {
         m_queuelocker.unlock();
         return false;
@@ -92,7 +108,6 @@ bool threadpool<T>::append(T* request)
     m_queuestat.post();
     return true;
 }
-
 
 template<typename T>
  void* threadpool<T>::worker(void* arg)

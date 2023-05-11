@@ -23,7 +23,7 @@ public:
 	//单例模式
 	static connection_pool *GetInstance();
 
-	void init(string url, string User, string PassWord, string DataBaseName, int Port, unsigned int MaxConn); 
+	void init(string url, string User, string PassWord, string DataBaseName, int Port, unsigned int MaxConn,int close_log); 
 	
 	connection_pool();
 	~connection_pool();

@@ -74,6 +74,8 @@ public:
     }
     void initmysql_result(connection_pool * connPool);
     void inittresultFile(connection_pool * connPool);
+    int timer_flag;
+    int improv;
 private:
     //初始连接
     void init();
@@ -99,6 +101,7 @@ private:
     bool add_content_length(int content_lenght);
     bool add_linger();
     bool add_blank_line();
+    
 
 public:
     

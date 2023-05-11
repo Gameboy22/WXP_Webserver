@@ -70,7 +70,7 @@ int main(int argc,char* argv[]){
         }}
         的逻辑原因是在创建线程池时，会创建locker类，而locker类会创建一个信号量，导致报错
         */
-        pool=new threadpool<http_conn>(10,20);
+        //pool=new threadpool<http_conn>(10,20,100);
     }
     catch(...)
     {
@@ -138,7 +138,7 @@ int main(int argc,char* argv[]){
                 }
                 //初始化连接
                 printf("successful\n");
-                users[connfd].init(connfd,client_address);
+                //users[connfd].init(connfd,client_address);
                 printf("init end\n");
             }
             else if(events[i].events&(EPOLLRDHUP|EPOLLHUP|EPOLLERR))
@@ -152,7 +152,7 @@ int main(int argc,char* argv[]){
                 //根据读的结果，决定将任务添加到线程池还是关闭连接
                 if(users[sockfd].read())
                 {
-                    pool->append(users+sockfd);
+                    //pool->append(users+sockfd);
                 }
                 else
                 {

@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include "log.h"
 #include <pthread.h>
+#include<assert.h>
 using namespace std;
 
  Log::Log(){
@@ -18,7 +19,7 @@ Log::~Log(){
 
 }
 
-bool Log::init(const char *file_name, int log_buf_size, int split_lines, int max_queue_size)
+bool Log::init(const char *file_name, int close_log,int log_buf_size, int split_lines, int max_queue_size)
 {
     if(max_queue_size>=1)
     {
@@ -39,15 +40,17 @@ bool Log::init(const char *file_name, int log_buf_size, int split_lines, int max
 
     const char *p=strrchr(file_name,'/');
     char log_full_name[256]={0};
-
+    int a=0;
     if(p==NULL)
     {
-        snprintf(log_full_name,255,"%d_%02d_%02d_%s",my_tm.tm_year+1900,my_tm.tm_mon+1,my_tm.tm_mday,file_name);
+        a=snprintf(log_full_name,255,"%d_%02d_%02d_%s",my_tm.tm_year+1900,my_tm.tm_mon+1,my_tm.tm_mday,file_name);
+        assert(a>=0);
     }
     else{
         strcpy(log_name,p+1);
         strncpy(dir_name,file_name,p-file_name+1);
-        snprintf(log_full_name,255,"%s%d_%02d_%02d_%s",dir_name,my_tm.tm_year+1900,my_tm.tm_mon+1,my_tm.tm_mday,log_name);
+        a=snprintf(log_full_name,255,"%s%d_%02d_%02d_%s",dir_name,my_tm.tm_year+1900,my_tm.tm_mon+1,my_tm.tm_mday,log_name);
+        assert(a>=0);
     }
 
     m_today = my_tm.tm_mday;
@@ -92,23 +95,26 @@ void Log::write_log(int level,const char *format,...)
 
      if (m_today != my_tm.tm_mday || m_count % m_split_lines == 0) //everyday log
     {
+        int x=0;
         
         char new_log[256] = {0};
         fflush(m_fp);
         fclose(m_fp);
         char tail[16] = {0};
        
-        snprintf(tail, 16, "%d_%02d_%02d_", my_tm.tm_year + 1900, my_tm.tm_mon + 1, my_tm.tm_mday);
-       
+        x=snprintf(tail, 16, "%d_%02d_%02d_", my_tm.tm_year + 1900, my_tm.tm_mon + 1, my_tm.tm_mday);
+       assert(x>=0);
         if (m_today != my_tm.tm_mday)
         {
-            snprintf(new_log, 255, "%s%s%s", dir_name, tail, log_name);
+            x=snprintf(new_log, 255, "%s%s%s", dir_name, tail, log_name);
+            assert(x>=0);
             m_today = my_tm.tm_mday;
             m_count = 0;
         }
         else
         {
-            snprintf(new_log, 255, "%s%s%s.%lld", dir_name, tail, log_name, m_count / m_split_lines);
+            x=snprintf(new_log, 255, "%s%s%s.%lld", dir_name, tail, log_name, m_count / m_split_lines);
+            assert(x>=0);
         }
         m_fp = fopen(new_log, "a");
     }
@@ -125,6 +131,8 @@ void Log::write_log(int level,const char *format,...)
                      my_tm.tm_year + 1900, my_tm.tm_mon + 1, my_tm.tm_mday,
                      my_tm.tm_hour, my_tm.tm_min, my_tm.tm_sec, now.tv_usec, s);
      int m = vsnprintf(m_buf + n, m_log_buf_size - n - 1, format, valst);
+     assert(n>=0);
+     assert(m>=0);
     m_buf[n + m] = '\n';
     m_buf[n + m + 1] = '\0';
     log_str = m_buf;

@@ -96,6 +96,7 @@ void http_conn::close_conn(bool real_close)
 {
     if(real_close && m_socketfd!=-1)
     {
+         printf("close %d\n", m_socketfd);
         removefd(m_epollfd,m_socketfd);
         m_user_count--;
         m_socketfd=-1;
@@ -140,6 +141,10 @@ void http_conn::init()
     m_checked_idx=0;
     m_read_idx=0;
     m_write_idx=0;
+    cgi = 0;
+    m_state = 0;
+    timer_flag = 0;
+    improv = 0;
     memset(m_read_buf,'\0',READ_BUFFER_SIZE);
     memset(m_write_buf,'\0',WRITE_BUFFER_SIZE);
     memset(m_real_file,'\0',FILENAME_LEN);
@@ -169,7 +174,7 @@ http_conn::LINE_STATUS http_conn::parse_line()
     {
         if((m_checked_idx>1)&&(m_read_buf[m_checked_idx-1]=='\r'))
         {
-            m_read_buf[m_checked_idx++]='\0';
+            m_read_buf[m_checked_idx-1]='\0';
             m_read_buf[m_checked_idx++]='\0';
             return LINE_OK;
         }
@@ -226,7 +231,7 @@ bool http_conn::read()
 //解析HTTP祈求行
 http_conn::HTTP_CODE http_conn::parse_request_line(char* text)
 {
-    m_url=strpbrk(text,"\t");
+    m_url=strpbrk(text," \t");
     if(!m_url)
     {
         return BAD_REQUEST;
@@ -237,6 +242,7 @@ http_conn::HTTP_CODE http_conn::parse_request_line(char* text)
     if(strcasecmp(method,"GET")==0)
     {
         m_method=GET;
+        
 
     }
     else if(strcasecmp(method,"POST")==0)
@@ -305,10 +311,9 @@ http_conn::HTTP_CODE http_conn::parse_headers(char* text)
         }
     }
     //处理头部
-    else if(strncasecmp(text,"Content-Length:",15)==0)
+    else if(strncasecmp(text,"Content-length:",15)==0)
     {
         text+=15;
-        text+=strspn(text," \t");
         m_host+=strspn(text," \t");
         m_content_length=atol(text);
 
@@ -319,7 +324,7 @@ http_conn::HTTP_CODE http_conn::parse_headers(char* text)
         text+=15;
         text+=strspn(text," \t");
         m_host=text;
-        m_content_length=atol(text);
+       
     }
     else
     {
@@ -348,7 +353,8 @@ http_conn::HTTP_CODE http_conn::process_read()
     HTTP_CODE ret=NO_REQUEST;
     char* text=0;
     
-    while (((m_check_state==CHECK_STATE_CONTENT)&&(line_status==LINE_OK))||((line_status=parse_line())==LINE_OK))
+      while ((m_check_state == CHECK_STATE_CONTENT && line_status == LINE_OK) ||
+    ((line_status = parse_line()) == LINE_OK))
     {
         //printf("%d\n",m_check_state);
         text=get_line();
@@ -395,7 +401,7 @@ http_conn::HTTP_CODE http_conn::process_read()
         default:
         {
             return INTERNAL_ERROR;
-            break;
+            
         }
             
         }
@@ -409,25 +415,31 @@ http_conn::HTTP_CODE http_conn::process_read()
 
 http_conn::HTTP_CODE http_conn::do_request()
 {
-    strcpy(m_real_file,doc_root);
-    int len=strlen(doc_root);
-    const char *p=strrchr(m_url,'/');
+    strcpy(m_real_file, doc_root);
+    int len = strlen(doc_root);
+    //printf("m_url:%s\n", m_url);
+    const char *p = strrchr(m_url, '/');
 
     //处理cgi
-    if (cgi == 1 && (*(p + 1) == '2' || *(p + 1) == '3')){
+    if (cgi == 1 && (*(p + 1) == '2' || *(p + 1) == '3'))
+    {
+
+        //根据标志判断是登录检测还是注册检测
         char flag = m_url[1];
-        char *m_url_real=(char*)malloc(sizeof(char)* 200);
+
+        char *m_url_real = (char *)malloc(sizeof(char) * 200);
         strcpy(m_url_real, "/");
         strcat(m_url_real, m_url + 2);
         strncpy(m_real_file + len, m_url_real, FILENAME_LEN - len - 1);
         free(m_url_real);
+
         //将用户名和密码提取出来
         //user=123&passwd=123
         char name[100], password[100];
         int i;
         for (i = 5; m_string[i] != '&'; ++i)
             name[i - 5] = m_string[i];
-            name[i - 5] = '\0';
+        name[i - 5] = '\0';
 
         int j = 0;
         for (i = i + 10; m_string[i] != '\0'; ++i, ++j)
@@ -516,7 +528,7 @@ http_conn::HTTP_CODE http_conn::do_request()
         strncpy(m_real_file + len, m_url, FILENAME_LEN - len - 1);
 
     if (stat(m_real_file, &m_file_stat) < 0)
-        return NO_REQUEST;
+        return NO__RESOURCE;
 
     if (!(m_file_stat.st_mode & S_IROTH))
         return FORBIDDEN_REQUEST;
@@ -528,25 +540,6 @@ http_conn::HTTP_CODE http_conn::do_request()
     m_file_address = (char *)mmap(0, m_file_stat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
     close(fd);
     return FILE__REQUEST;
-
-    //////////////////////////////////////////////////////////////////
-    // strncpy(m_real_file+len,m_url,FILENAME_LEN-len-1);
-    // if(stat(m_real_file,&m_file_stat)<0){
-    //     return NO__RESOURCE;
-    // }
-    // if(!(m_file_stat.st_mode&S_IROTH))
-    // {
-    //     return FORBIDDEN_REQUEST;
-    // }
-    // if(S_ISDIR(m_file_stat.st_mode))
-    // {
-    //     return BAD_REQUEST;
-    // }
-
-    // int fd=open(m_real_file,O_RDONLY);
-    // m_file_address=(char*)mmap(0,m_file_stat.st_size,PROT_READ,MAP_PRIVATE,fd,0);
-    // close(fd);
-    // return FILE__REQUEST;
 }
 
 
@@ -652,22 +645,20 @@ bool http_conn::add_status_line(int status,const char* title)
 
 bool http_conn::add_headers(int content_length)
 {
-    add_content_length(content_length);
-    add_linger();
-    return add_blank_line();
+    return add_content_length(content_length)&&add_linger()&&add_blank_line();
 }
 
 bool http_conn::add_content_length(int content_lenght){
     return add_response("Content-Length:%d\r\n",content_lenght);
 }
-
+///////////////////////////
 bool http_conn::add_content_type()
 {
     return add_response("Content-Type:%s\r\n", "text/html");
 }
 bool http_conn::add_linger()
 {
-    return add_response("Connection: %s\r\n",(m_linger==true)?"keep-alive":"close");
+    return add_response("Connection:%s\r\n",(m_linger==true)?"keep-alive":"close");
 
 }
 
@@ -681,88 +672,64 @@ bool http_conn::add_content(const char* content)
     return add_response("%s" ,content);
 }
 
-//根据请求处理结果，返回客户端的内容
+//根据请求处理结果，返回客户端的内容///////////////////////////////////////////////////
 bool http_conn::process_write(HTTP_CODE ret)
 {
-    switch (ret)
+     switch (ret)
     {
-    case  INTERNAL_ERROR:
-        {
-            add_status_line(500,error_500_title);
-            //printf("errno: %s\n",error_500_from);
-            add_headers(strlen(error_500_from));
-            if(!add_content(error_500_from))
-            {
-                return false;
-            }
-            break;
-        }
-    case BAD_REQUEST:
+    case INTERNAL_ERROR:
     {
-        add_status_line(400,error_400_title);
-        //printf("errno: %s\n",error_400_form);
-        add_headers(strlen(error_400_form));
-        if(!add_content(error_400_form))
-        {
+        add_status_line(500, error_500_title);
+        add_headers(strlen(error_500_from));
+        if (!add_content(error_500_from))
             return false;
-        }
         break;
     }
-    case NO__RESOURCE:
+    case BAD_REQUEST:
     {
-        add_status_line(404,error_404_title);
-        //printf("errno: %s\n",error_404_from);
+        add_status_line(404, error_404_title);
         add_headers(strlen(error_404_from));
-        if(!add_content(error_404_from))
-        {
+        if (!add_content(error_404_from))
             return false;
-        }
         break;
     }
     case FORBIDDEN_REQUEST:
     {
-        add_status_line(403,error_403_title);
-        //printf("errno: %s\n",error_403_from);
+        add_status_line(403, error_403_title);
         add_headers(strlen(error_403_from));
-        if(!add_content(error_403_from))
-        {
+        if (!add_content(error_403_from))
             return false;
-        }
         break;
     }
     case FILE__REQUEST:
     {
-        add_status_line(200,ok_200_title);
-        //printf("errno: %s\n",ok_200_title);
-        if(m_file_stat.st_size!=0)
+        add_status_line(200, ok_200_title);
+        if (m_file_stat.st_size != 0)
         {
             add_headers(m_file_stat.st_size);
-            m_iv[0].iov_base=m_write_buf;
-            m_iv[0].iov_len=m_write_idx;
-            m_iv[1].iov_base=m_file_address;
-            m_iv[1].iov_len=m_file_stat.st_size;
-            m_iv_count=2;
+            m_iv[0].iov_base = m_write_buf;
+            m_iv[0].iov_len = m_write_idx;
+            m_iv[1].iov_base = m_file_address;
+            m_iv[1].iov_len = m_file_stat.st_size;
+            m_iv_count = 2;
+            btyes_to_send = m_write_idx + m_file_stat.st_size;
             return true;
         }
-        else{
-            const char* ok_string="<html><body></body></html>";
+        else
+        {
+            const char *ok_string = "<html><body></body></html>";
             add_headers(strlen(ok_string));
-            if(!add_content(ok_string))
-            {
+            if (!add_content(ok_string))
                 return false;
-            }
         }
-        break;
     }
-    
     default:
-    {
-        break;
+        return false;
     }
-    }
-    m_iv[0].iov_base=m_write_buf;
-    m_iv[0].iov_len=m_write_idx;
-    m_iv_count=1;
+    m_iv[0].iov_base = m_write_buf;
+    m_iv[0].iov_len = m_write_idx;
+    m_iv_count = 1;
+    btyes_to_send = m_write_idx;
     return true;
 }
 
@@ -776,7 +743,7 @@ void http_conn::process()
         modfd(m_epollfd,m_socketfd,EPOLLIN,m_TRIGMode);
         return;
     }
-    //printf("process_write\n");
+    //printf("process_write+%d\n",read_ret);
     bool write_ret=process_write(read_ret);
     
     if(!write_ret)
@@ -786,3 +753,4 @@ void http_conn::process()
 
     modfd(m_epollfd,m_socketfd,EPOLLOUT,m_TRIGMode);
 }
+
